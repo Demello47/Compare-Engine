@@ -319,4 +319,168 @@ h1 {{
 .summary {{
     margin-top: 30px;
     padding: 15px;
-    background: #
+    background: #222;
+}}
+
+.summary div {{
+    margin: 4px 0;
+}}
+</style>
+</head>
+<body>
+
+<h1>Log Comparison</h1>
+
+<div class="files">
+    <div class="file-a">FILE A: {escape(str(file_a))}</div>
+    <div class="file-b">FILE B: {escape(str(file_b))}</div>
+</div>
+"""
+
+
+def write_html_report(
+    results,
+    statistics,
+    file_a,
+    file_b,
+    config
+):
+    output_path = Path(config["html_report"])
+
+    output_path.parent.mkdir(
+        parents=True,
+        exist_ok=True
+    )
+
+    with output_path.open(
+        "w",
+        encoding="utf-8"
+    ) as file:
+        file.write(
+            html_header(
+                file_a,
+                file_b
+            )
+        )
+
+        current_node = None
+
+        for result in results:
+            node_title = get_node_title(result)
+
+            if node_title != current_node:
+                current_node = node_title
+
+                file.write(
+                    f'<div class="node">'
+                    f'NODE: {escape(node_title)}'
+                    f'</div>\n'
+                )
+
+            result_type = result["type"]
+
+            css_class = result_type.lower()
+
+            if result.get("keyword"):
+                css_class += " keyword"
+                label = "KEYWORD"
+            else:
+                label = result_type
+
+            line_a = result.get("line_a")
+            line_b = result.get("line_b")
+
+            text_a = get_line_text(line_a)
+            text_b = get_line_text(line_b)
+
+            number_a = get_line_number(line_a)
+            number_b = get_line_number(line_b)
+
+            if result_type == "CHANGED":
+                html_a, html_b = html_diff(
+                    text_a,
+                    text_b
+                )
+
+                file.write(
+                    f'<div class="row {css_class}">'
+                    f'<span class="label">[{label}]</span>'
+                    f'<span class="file-a">'
+                    f'{escape(Path(file_a).name)}'
+                    f'</span> '
+                    f'<span class="line-number">'
+                    f'Line {number_a}'
+                    f'</span> '
+                    f'{html_a}'
+                    f'</div>\n'
+                )
+
+                file.write(
+                    f'<div class="row {css_class}">'
+                    f'<span class="label">[{label}]</span>'
+                    f'<span class="file-b">'
+                    f'{escape(Path(file_b).name)}'
+                    f'</span> '
+                    f'<span class="line-number">'
+                    f'Line {number_b}'
+                    f'</span> '
+                    f'{html_b}'
+                    f'</div>\n'
+                )
+
+            elif result_type in ("SAME", "REMOVED"):
+                file.write(
+                    f'<div class="row {css_class}">'
+                    f'<span class="label">[{label}]</span>'
+                    f'<span class="file-a">'
+                    f'{escape(Path(file_a).name)}'
+                    f'</span> '
+                    f'<span class="line-number">'
+                    f'Line {number_a}'
+                    f'</span> '
+                    f'{escape(text_a)}'
+                    f'</div>\n'
+                )
+
+            elif result_type == "ADDED":
+                file.write(
+                    f'<div class="row {css_class}">'
+                    f'<span class="label">[{label}]</span>'
+                    f'<span class="file-b">'
+                    f'{escape(Path(file_b).name)}'
+                    f'</span> '
+                    f'<span class="line-number">'
+                    f'Line {number_b}'
+                    f'</span> '
+                    f'{escape(text_b)}'
+                    f'</div>\n'
+                )
+
+        file.write(
+            '<div class="summary">'
+        )
+
+        file.write(
+            '<h2>Summary</h2>'
+        )
+
+        for name in (
+            "TOTAL",
+            "SAME",
+            "CHANGED",
+            "ADDED",
+            "REMOVED",
+        ):
+            file.write(
+                f'<div>{name}: '
+                f'{statistics.get(name, 0):,}'
+                f'</div>'
+            )
+
+        file.write(
+            '</div>'
+        )
+
+        file.write(
+            '</body></html>'
+        )
